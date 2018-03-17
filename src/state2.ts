@@ -1,19 +1,23 @@
 
 type AccountState = "OPEN" | "HELD" | "CLOSED";
-type AccountTransition = "placeHold" | "removeHold" | "close" | "reopen";
+type AccountEvent = "placeHold" | "removeHold" | "close" | "reopen";
 
 type AccountBehavior = {
   [key in AccountState]: StateBehavior
 }
 type StateBehavior = {
-  [key in AccountTransition]: { nextState?: AccountState, predicate?: (Account) => boolean } | null;
+  [key in AccountEvent]: EventBehavior | null;
+}
+type EventBehavior = {
+  nextState?: AccountState;
+  predicate?: (Account) => boolean
 }
 
 const behavior: AccountBehavior = {
   OPEN: {
     placeHold: { nextState: "HELD" },
     removeHold: null,
-    close: null,
+    close: { nextState: "CLOSED" },
     reopen: null
   },
   HELD: {
@@ -54,12 +58,12 @@ class Account {
     this.transition("removeHold")
   }
 
-  mayDo(transition: AccountTransition): boolean {
-    return behavior[this.state][transition] != null;
+  mayDo(event: AccountEvent): boolean {
+    return behavior[this.state][event] != null;
   }
 
-  private transition(transition: AccountTransition): void {
-    let tb = behavior[this.state][transition];
+  private transition(event: AccountEvent): void {
+    let tb = behavior[this.state][event];
     if (tb == null || tb.nextState == null) {
       // error, not allowed
     } else {
