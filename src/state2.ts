@@ -1,6 +1,6 @@
 
 type AccountState = "OPEN" | "HELD" | "CLOSED";
-type AccountEvent = "placeHold" | "removeHold" | "close" | "reopen";
+type AccountEvent = "deposit" | "withdraw" | "available" | "placeHold" | "removeHold" | "close" | "reopen";
 
 type AccountBehavior = {
   [key in AccountState]: StateBehavior
@@ -15,18 +15,28 @@ type EventBehavior = {
 
 const behavior: AccountBehavior = {
   OPEN: {
+    deposit: {},
+    withdraw: {},
+    available: {},
     placeHold: { nextState: "HELD" },
     removeHold: null,
     close: { nextState: "CLOSED" },
     reopen: null
   },
   HELD: {
+    deposit: {},
+    withdraw: null,
+    // not right, should return 0 instead of actual balance
+    available: {},
     placeHold: null,
     removeHold: { nextState: "OPEN" },
     close: { nextState: "CLOSED" },
     reopen: null,
   },
   CLOSED: {
+    deposit: null,
+    withdraw: null,
+    available: null,
     placeHold: null,
     removeHold: null,
     close: null,
@@ -39,35 +49,44 @@ class Account {
   state: AccountState = "OPEN";
 
   deposit(amount: number) {
-    this.balance += amount;
+    this.perform("deposit", () => this.balance += amount);
   }
 
   withdraw(amount: number) {
-    this.balance -= amount;
+    this.perform("withdraw", () => this.balance -= amount);
   }
 
-  available() {
-    return this.balance;
+  available(): number {
+    return this.perform("available", () => this.balance);
   }
 
   placeHold() {
-    this.transition("placeHold")
+    this.perform("placeHold", () => null);
   }
 
   removeHold() {
-    this.transition("removeHold")
+    this.perform("removeHold", () => null);
   }
 
   mayDo(event: AccountEvent): boolean {
     return behavior[this.state][event] != null;
   }
 
-  private transition(event: AccountEvent): void {
-    let tb = behavior[this.state][event];
-    if (tb == null || tb.nextState == null) {
+  private perform<T>(event: AccountEvent, logic: () => T): T {
+    if (!this.mayDo(event)) {
+      // not allowed, throw error
+    }
+    let value = logic();
+    this.transitionIfNeeded(event);
+    return value;
+  }
+
+  private transitionIfNeeded(event: AccountEvent): void {
+    let eb = behavior[this.state][event];
+    if (eb == null || eb.nextState == null) {
       // error, not allowed
     } else {
-      this.state = tb.nextState;
+      this.state = eb.nextState;
     }
   }
 
